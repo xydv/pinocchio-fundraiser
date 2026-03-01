@@ -10,7 +10,6 @@ use wincode::SchemaRead;
 
 use crate::{constants::MIN_AMOUNT_TO_RAISE, state::fundraiser::Fundraiser};
 
-// use crate::state::Escrow;
 #[derive(SchemaRead)]
 struct InitializeData {
     pub bump: u8,
@@ -37,11 +36,14 @@ pub fn process_initialize_instruction(accounts: &[AccountView], data: &[u8]) -> 
 
     let mint_state = pinocchio_token::state::Mint::from_account_view(mint)?;
 
+    // checks
     assert!(
         u64::from_le_bytes(ix_data.amount_to_raise)
             > MIN_AMOUNT_TO_RAISE.pow(mint_state.decimals() as u32),
         "amount to be raised is less than minimum amount"
     );
+    assert!(maker.is_signer(), "maker must be signer");
+    assert!(mint_state.is_initialized(), "mint must be preinitialized");
 
     let bump = ix_data.bump;
     let seed = [b"fundraiser".as_ref(), maker.address().as_ref(), &[bump]];
@@ -49,7 +51,7 @@ pub fn process_initialize_instruction(accounts: &[AccountView], data: &[u8]) -> 
     let fundraiser_account_pda = derive_address(&seed, None, &crate::ID.to_bytes());
     assert_eq!(fundraiser_account_pda, *fundraiser.address().as_array());
 
-    let bump = [bump.to_le()];
+    let bump = [bump];
     let seed = [
         Seed::from(b"escrow"),
         Seed::from(maker.address().as_array()),

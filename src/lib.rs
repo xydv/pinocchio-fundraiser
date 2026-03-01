@@ -5,8 +5,6 @@ use pinocchio::{
 
 use crate::instructions::FundraiserInstructions;
 
-// use crate::instructions::EscrowInstrctions;
-
 mod constants;
 mod instructions;
 mod state;
@@ -29,7 +27,17 @@ pub fn process_instruction(
     match FundraiserInstructions::try_from(discriminator)? {
         FundraiserInstructions::Initialize => {
             instructions::process_initialize_instruction(accounts, data)?
-        } // _ => return Err(ProgramError::InvalidInstructionData),
+        }
+        FundraiserInstructions::Contribute => {
+            instructions::process_initialize_instruction(accounts, data)?
+        }
+        FundraiserInstructions::Checker => {
+            instructions::process_checker_instruction(accounts, data)?
+        }
+        FundraiserInstructions::Refund => {
+            instructions::process_initialize_instruction(accounts, data)?
+        }
+        _ => return Err(ProgramError::InvalidInstructionData),
     }
     Ok(())
 }

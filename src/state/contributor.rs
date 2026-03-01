@@ -3,22 +3,17 @@ use wincode::SchemaRead;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, SchemaRead)]
-pub struct Fundraiser {
-    pub maker: [u8; 32],
-    pub mint_to_raise: [u8; 32],
-    pub amount_to_raise: [u8; 8],
-    pub current_amount: [u8; 8],
-    pub time_started: [u8; 8],
-    pub duration: u8,
+pub struct Contributor {
+    pub amount: [u8; 8],
     pub bump: u8,
 }
 
-impl Fundraiser {
-    pub const LEN: usize = std::mem::size_of::<Fundraiser>();
+impl Contributor {
+    const LEN: usize = std::mem::size_of::<Contributor>();
 
     pub fn from_account_info(account_info: &AccountView) -> Result<&mut Self, ProgramError> {
         let mut data = account_info.try_borrow_mut()?;
-        if data.len() != Fundraiser::LEN {
+        if data.len() != Contributor::LEN {
             return Err(ProgramError::InvalidAccountData);
         }
 
