@@ -27,17 +27,17 @@ pub fn process_checker_instruction(accounts: &[AccountView], _data: &[u8]) -> Pr
         let fundraiser_state = wincode::deserialize::<Fundraiser>(&fundraiser_data)
             .map_err(|_| ProgramError::InvalidInstructionData)?;
 
-        if maker_ata.is_data_empty() && maker_ata.lamports() == 0 {
-            pinocchio_associated_token_account::instructions::Create {
-                funding_account: maker,
-                account: maker_ata,
-                wallet: maker,
-                mint: mint,
-                token_program: token_program,
-                system_program: system_program,
-            }
-            .invoke()?;
-        }
+        // if maker_ata.is_data_empty() && maker_ata.lamports() == 0 {
+        //     pinocchio_associated_token_account::instructions::Create {
+        //         funding_account: maker,
+        //         account: maker_ata,
+        //         wallet: maker,
+        //         mint: mint,
+        //         token_program: token_program,
+        //         system_program: system_program,
+        //     }
+        //     .invoke()?;
+        // }
 
         let maker_ata_state = TokenAccount::from_account_view(&maker_ata)?;
         let vault_state = TokenAccount::from_account_view(&vault)?;

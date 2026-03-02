@@ -87,15 +87,15 @@ pub fn process_initialize_instruction(accounts: &[AccountView], data: &[u8]) -> 
     }
 
     // we can do this client side to reduce CU
-    pinocchio_associated_token_account::instructions::Create {
-        funding_account: maker,
-        account: vault,
-        wallet: fundraiser,
-        mint: mint,
-        token_program: token_program,
-        system_program: system_program,
-    }
-    .invoke()?;
+    // pinocchio_associated_token_account::instructions::Create {
+    //     funding_account: maker,
+    //     account: vault,
+    //     wallet: fundraiser,
+    //     mint: mint,
+    //     token_program: token_program,
+    //     system_program: system_program,
+    // }
+    // .invoke()?;
 
     Ok(())
 }

@@ -49,7 +49,11 @@ mod tests {
         let (fundraiser_pda, bump) =
             Pubkey::find_program_address(&[b"fundraiser", maker.pubkey().as_ref()], &program_id);
 
-        let vault = get_associated_token_address(&fundraiser_pda, &mint);
+        // let vault = get_associated_token_address(&fundraiser_pda, &mint);
+        let vault = CreateAssociatedTokenAccount::new(&mut svm, &maker, &mint)
+            .owner(&fundraiser_pda)
+            .send()
+            .unwrap();
 
         let system_program = solana_sdk_ids::system_program::ID;
         let associated_token_program = spl_associated_token_account::id();
@@ -109,7 +113,11 @@ mod tests {
         let (fundraiser_pda, bump) =
             Pubkey::find_program_address(&[b"fundraiser", maker.pubkey().as_ref()], &program_id);
 
-        let vault = get_associated_token_address(&fundraiser_pda, &mint);
+        // let vault = get_associated_token_address(&fundraiser_pda, &mint);
+        let vault = CreateAssociatedTokenAccount::new(&mut svm, &maker, &mint)
+            .owner(&fundraiser_pda)
+            .send()
+            .unwrap();
 
         let system_program = solana_sdk_ids::system_program::ID;
         let associated_token_program = spl_associated_token_account::id();
@@ -209,8 +217,16 @@ mod tests {
         let (fundraiser_pda, bump) =
             Pubkey::find_program_address(&[b"fundraiser", maker.pubkey().as_ref()], &program_id);
 
-        let vault = get_associated_token_address(&fundraiser_pda, &mint);
-        let maker_ata = get_associated_token_address(&maker.pubkey(), &mint);
+        // let vault = get_associated_token_address(&fundraiser_pda, &mint);
+        let vault = CreateAssociatedTokenAccount::new(&mut svm, &maker, &mint)
+            .owner(&fundraiser_pda)
+            .send()
+            .unwrap();
+        // let maker_ata = get_associated_token_address(&maker.pubkey(), &mint);
+        let maker_ata = CreateAssociatedTokenAccount::new(&mut svm, &maker, &mint)
+            .owner(&maker.pubkey())
+            .send()
+            .unwrap();
 
         let system_program = solana_sdk_ids::system_program::ID;
         let associated_token_program = spl_associated_token_account::id();
@@ -306,7 +322,11 @@ mod tests {
             &program_id,
         );
 
-        let vault = get_associated_token_address(&fundraiser_pda, &mint);
+        // let vault = get_associated_token_address(&fundraiser_pda, &mint);
+        let vault = CreateAssociatedTokenAccount::new(&mut svm, &maker, &mint)
+            .owner(&fundraiser_pda)
+            .send()
+            .unwrap();
         let user_ata = get_associated_token_address(&user.pubkey(), &mint);
 
         let amount_to_raise: u64 = 1_000_000_000;
