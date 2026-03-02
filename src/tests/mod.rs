@@ -270,20 +270,144 @@ mod tests {
             .send_transaction(Transaction::new(&[&maker], message, svm.latest_blockhash()))
             .unwrap();
 
-        println!("\nChecker (Finalize) transaction successful");
+        println!("\nChecker transaction successful");
         println!("CUs Consumed: {}", tx.compute_units_consumed);
-        println!("CUs Consumed: {:#?}", tx.logs);
+        // println!("CUs Consumed: {:#?}", tx.logs);
 
         let maker_ata_account = svm.get_account(&maker_ata).expect("Maker ATA should exist");
         let amount_received =
             u64::from_le_bytes(maker_ata_account.data[64..72].try_into().unwrap());
-        println!("amount_received {amount_received}");
-        println!("amount_to_raise {amount_to_raise}");
         assert_eq!(amount_received, amount_to_raise);
-        println!("Verified: Maker received {} tokens", amount_received);
 
         let fundraiser_account = svm.get_account(&fundraiser_pda);
         assert!(fundraiser_account.is_none() || fundraiser_account.unwrap().lamports == 0);
-        println!("Verified: Fundraiser PDA closed.");
+    }
+
+    #[test]
+    pub fn test_refund_instruction() {
+        let (mut svm, maker) = setup();
+        let user = Keypair::new();
+        svm.airdrop(&user.pubkey(), 5 * LAMPORTS_PER_SOL).unwrap();
+
+        let program_id = program_id();
+        let mint = CreateMint::new(&mut svm, &maker)
+            .decimals(6)
+            .authority(&maker.pubkey())
+            .send()
+            .unwrap();
+
+        let (fundraiser_pda, f_bump) =
+            Pubkey::find_program_address(&[b"fundraiser", maker.pubkey().as_ref()], &program_id);
+        let (contributor_pda, c_bump) = Pubkey::find_program_address(
+            &[
+                b"contributor",
+                fundraiser_pda.as_ref(),
+                user.pubkey().as_ref(),
+            ],
+            &program_id,
+        );
+
+        let vault = get_associated_token_address(&fundraiser_pda, &mint);
+        let user_ata = get_associated_token_address(&user.pubkey(), &mint);
+
+        let amount_to_raise: u64 = 1_000_000_000;
+        let init_data = [
+            vec![0u8],
+            vec![f_bump],
+            amount_to_raise.to_le_bytes().to_vec(),
+            vec![30],
+        ]
+        .concat();
+
+        let init_ix = Instruction {
+            program_id,
+            accounts: vec![
+                AccountMeta::new(maker.pubkey(), true),
+                AccountMeta::new_readonly(mint, false),
+                AccountMeta::new(fundraiser_pda, false),
+                AccountMeta::new(vault, false),
+                AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false),
+                AccountMeta::new_readonly(spl_token::ID, false),
+                AccountMeta::new_readonly(spl_associated_token_account::id(), false),
+            ],
+            data: init_data,
+        };
+        svm.send_transaction(Transaction::new(
+            &[&maker],
+            Message::new(&[init_ix], Some(&maker.pubkey())),
+            svm.latest_blockhash(),
+        ))
+        .unwrap();
+
+        let contribution: u64 = 200_000_000;
+
+        CreateAssociatedTokenAccount::new(&mut svm, &user, &mint)
+            .owner(&user.pubkey())
+            .send()
+            .unwrap();
+        MintTo::new(&mut svm, &maker, &mint, &user_ata, contribution)
+            .send()
+            .unwrap();
+
+        let contribute_data =
+            [vec![1u8], contribution.to_le_bytes().to_vec(), vec![c_bump]].concat();
+        let contribute_ix = Instruction {
+            program_id,
+            accounts: vec![
+                AccountMeta::new(user.pubkey(), true),
+                AccountMeta::new_readonly(mint, false),
+                AccountMeta::new(fundraiser_pda, false),
+                AccountMeta::new(contributor_pda, false),
+                AccountMeta::new(user_ata, false),
+                AccountMeta::new(vault, false),
+                AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false),
+                AccountMeta::new_readonly(spl_token::ID, false),
+            ],
+            data: contribute_data,
+        };
+        svm.send_transaction(Transaction::new(
+            &[&user],
+            Message::new(&[contribute_ix], Some(&user.pubkey())),
+            svm.latest_blockhash(),
+        ))
+        .unwrap();
+
+        // refund
+        let refund_data = vec![3u8];
+
+        let refund_ix = Instruction {
+            program_id,
+            accounts: vec![
+                AccountMeta::new(user.pubkey(), true),
+                AccountMeta::new(maker.pubkey(), false),
+                AccountMeta::new_readonly(mint, false),
+                AccountMeta::new(fundraiser_pda, false),
+                AccountMeta::new(contributor_pda, false),
+                AccountMeta::new(user_ata, false),
+                AccountMeta::new(vault, false),
+                AccountMeta::new_readonly(spl_token::ID, false),
+                AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false),
+            ],
+            data: refund_data,
+        };
+
+        let tx = svm
+            .send_transaction(Transaction::new(
+                &[&user],
+                Message::new(&[refund_ix], Some(&user.pubkey())),
+                svm.latest_blockhash(),
+            ))
+            .unwrap();
+
+        println!("\nRefund transaction successful");
+        println!("CUs Consumed: {}", tx.compute_units_consumed);
+
+        // verify
+        let user_ata_account = svm.get_account(&user_ata).unwrap();
+        let final_balance = u64::from_le_bytes(user_ata_account.data[64..72].try_into().unwrap());
+        assert_eq!(final_balance, contribution);
+
+        let contributor_account = svm.get_account(&contributor_pda);
+        assert!(contributor_account.is_none());
     }
 }
