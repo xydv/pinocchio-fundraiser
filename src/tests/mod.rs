@@ -192,4 +192,98 @@ mod tests {
         println!("\nContribute transaction successful");
         println!("CUs Consumed: {}", tx.compute_units_consumed);
     }
+
+    #[test]
+    pub fn test_checker_instruction() {
+        let (mut svm, maker) = setup();
+        let user = Keypair::new();
+        svm.airdrop(&user.pubkey(), 5 * LAMPORTS_PER_SOL).unwrap();
+
+        let program_id = program_id();
+        let mint = CreateMint::new(&mut svm, &maker)
+            .decimals(6)
+            .authority(&maker.pubkey())
+            .send()
+            .unwrap();
+
+        let (fundraiser_pda, bump) =
+            Pubkey::find_program_address(&[b"fundraiser", maker.pubkey().as_ref()], &program_id);
+
+        let vault = get_associated_token_address(&fundraiser_pda, &mint);
+        let maker_ata = get_associated_token_address(&maker.pubkey(), &mint);
+
+        let system_program = solana_sdk_ids::system_program::ID;
+        let associated_token_program = spl_associated_token_account::id();
+
+        let amount_to_raise: u64 = 500_000_000;
+        let duration: u8 = 30;
+
+        let mut ix_data = Vec::new();
+        ix_data.push(0u8);
+        ix_data.push(bump);
+        ix_data.extend_from_slice(&amount_to_raise.to_le_bytes());
+        ix_data.push(duration);
+
+        let initialize_ix = Instruction {
+            program_id,
+            accounts: vec![
+                AccountMeta::new(maker.pubkey(), true),
+                AccountMeta::new_readonly(mint, false),
+                AccountMeta::new(fundraiser_pda, false),
+                AccountMeta::new(vault, false),
+                AccountMeta::new_readonly(system_program, false),
+                AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
+                AccountMeta::new_readonly(associated_token_program, false),
+            ],
+            data: ix_data,
+        };
+
+        let message = Message::new(&[initialize_ix], Some(&maker.pubkey()));
+        let recent_blockhash = svm.latest_blockhash();
+        let transaction = Transaction::new(&[&maker], message, recent_blockhash);
+
+        svm.send_transaction(transaction).unwrap();
+        // checker
+        // directly minting to vault
+        MintTo::new(&mut svm, &maker, &mint, &vault, amount_to_raise)
+            .send()
+            .unwrap();
+
+        let checker_data = vec![2u8];
+        let checker_ix = Instruction {
+            program_id,
+            accounts: vec![
+                AccountMeta::new(maker.pubkey(), true),
+                AccountMeta::new_readonly(mint, false),
+                AccountMeta::new(fundraiser_pda, false),
+                AccountMeta::new(vault, false),
+                AccountMeta::new(maker_ata, false),
+                AccountMeta::new_readonly(spl_token::ID, false),
+                AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false),
+                AccountMeta::new_readonly(spl_associated_token_account::id(), false),
+            ],
+            data: checker_data,
+        };
+
+        let message = Message::new(&[checker_ix], Some(&maker.pubkey()));
+        let tx = svm
+            .send_transaction(Transaction::new(&[&maker], message, svm.latest_blockhash()))
+            .unwrap();
+
+        println!("\nChecker (Finalize) transaction successful");
+        println!("CUs Consumed: {}", tx.compute_units_consumed);
+        println!("CUs Consumed: {:#?}", tx.logs);
+
+        let maker_ata_account = svm.get_account(&maker_ata).expect("Maker ATA should exist");
+        let amount_received =
+            u64::from_le_bytes(maker_ata_account.data[64..72].try_into().unwrap());
+        println!("amount_received {amount_received}");
+        println!("amount_to_raise {amount_to_raise}");
+        assert_eq!(amount_received, amount_to_raise);
+        println!("Verified: Maker received {} tokens", amount_received);
+
+        let fundraiser_account = svm.get_account(&fundraiser_pda);
+        assert!(fundraiser_account.is_none() || fundraiser_account.unwrap().lamports == 0);
+        println!("Verified: Fundraiser PDA closed.");
+    }
 }
