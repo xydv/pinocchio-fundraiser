@@ -162,7 +162,7 @@ mod tests {
             &program_id,
         );
 
-        let contribute_amount: u64 = 200_000_000;
+        let contribute_amount: u64 = 50_000_000;
 
         let mut ix_data = Vec::new();
         ix_data.push(1u8);
@@ -272,7 +272,6 @@ mod tests {
 
         println!("\nChecker transaction successful");
         println!("CUs Consumed: {}", tx.compute_units_consumed);
-        // println!("CUs Consumed: {:#?}", tx.logs);
 
         let maker_ata_account = svm.get_account(&maker_ata).expect("Maker ATA should exist");
         let amount_received =
@@ -339,7 +338,7 @@ mod tests {
         ))
         .unwrap();
 
-        let contribution: u64 = 200_000_000;
+        let contribution: u64 = 50_000_000;
 
         CreateAssociatedTokenAccount::new(&mut svm, &user, &mint)
             .owner(&user.pubkey())

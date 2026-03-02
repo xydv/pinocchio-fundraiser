@@ -3,11 +3,7 @@ use pinocchio::{
     cpi::{Seed, Signer},
     error::ProgramError,
 };
-use pinocchio_log::log;
-use pinocchio_token::{
-    instructions::{CloseAccount, Transfer},
-    state::TokenAccount,
-};
+use pinocchio_token::{instructions::Transfer, state::TokenAccount};
 
 use crate::state::fundraiser::Fundraiser;
 
@@ -26,7 +22,6 @@ pub fn process_checker_instruction(accounts: &[AccountView], _data: &[u8]) -> Pr
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
-    log!("1");
     let (amount, bump) = {
         let fundraiser_data = unsafe { fundrasier.borrow_unchecked() };
         let fundraiser_state = wincode::deserialize::<Fundraiser>(&fundraiser_data)
@@ -75,9 +70,6 @@ pub fn process_checker_instruction(accounts: &[AccountView], _data: &[u8]) -> Pr
         (fundraiser_state.amount_to_raise, fundraiser_state.bump)
     };
 
-    log!("amount {}", u64::from_le_bytes(amount));
-
-    log!("2");
     let bump = [bump];
     let seed = [
         Seed::from(b"fundraiser"),

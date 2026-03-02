@@ -37,7 +37,6 @@ pub fn process_instruction(
             instructions::process_checker_instruction(accounts, data)?
         }
         FundraiserInstructions::Refund => instructions::process_refund_instruction(accounts, data)?,
-        _ => return Err(ProgramError::InvalidInstructionData),
     }
     Ok(())
 }

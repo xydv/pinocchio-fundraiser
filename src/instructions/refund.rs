@@ -2,16 +2,17 @@ use pinocchio::{
     AccountView, ProgramResult,
     cpi::{Seed, Signer},
     error::ProgramError,
+    sysvars::{Sysvar, clock::Clock},
 };
-use pinocchio_log::log;
 use pinocchio_token::{instructions::Transfer, state::TokenAccount};
 
 use crate::{
+    constants::SECONDS_TO_DAYS,
     helpers::sub_le_bytes,
     state::{contributor::Contributor, fundraiser::Fundraiser},
 };
 
-pub fn process_refund_instruction(accounts: &[AccountView], data: &[u8]) -> ProgramResult {
+pub fn process_refund_instruction(accounts: &[AccountView], _data: &[u8]) -> ProgramResult {
     let [
         user,
         maker,
@@ -27,8 +28,6 @@ pub fn process_refund_instruction(accounts: &[AccountView], data: &[u8]) -> Prog
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
-    log!("1");
-
     {
         let contributor_ata_state = TokenAccount::from_account_view(contributor_ata)?;
         if contributor_ata_state.owner() != user.address() {
@@ -38,15 +37,22 @@ pub fn process_refund_instruction(accounts: &[AccountView], data: &[u8]) -> Prog
             return Err(ProgramError::InvalidAccountData);
         }
     }
-    log!("2");
 
     let (amount, bump) = {
         let fundraiser_state = Fundraiser::from_account_info(&fundraiser)?;
         let contributor_state = Contributor::from_account_info(&contributor)?;
         let vault_state = TokenAccount::from_account_view(&vault)?;
+        let current_time = Clock::get()?.unix_timestamp;
 
         assert!(
-            vault_state.amount().to_le_bytes() < fundraiser_state.amount_to_raise,
+            fundraiser_state.duration
+                > ((current_time - i64::from_le_bytes(fundraiser_state.time_started))
+                    / SECONDS_TO_DAYS) as u8,
+            "fundraising ended"
+        );
+
+        assert!(
+            vault_state.amount() < u64::from_le_bytes(fundraiser_state.amount_to_raise),
             "target met"
         );
 
@@ -55,7 +61,6 @@ pub fn process_refund_instruction(accounts: &[AccountView], data: &[u8]) -> Prog
 
         (contributor_state.amount, fundraiser_state.bump)
     };
-    log!("3");
 
     let bump = [bump];
     let seed = [

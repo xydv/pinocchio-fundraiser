@@ -2,14 +2,14 @@ use pinocchio::{
     AccountView, ProgramResult,
     cpi::{Seed, Signer},
     error::ProgramError,
-    sysvars::{Sysvar, rent::Rent},
+    sysvars::{Sysvar, clock::Clock, rent::Rent},
 };
-use pinocchio_log::log;
 use pinocchio_system::instructions::CreateAccount;
 use pinocchio_token::state::TokenAccount;
 use wincode::SchemaRead;
 
 use crate::{
+    constants::{MAX_CONTRIBUTION_PERCENTAGE, PERCENTAGE_SCALER, SECONDS_TO_DAYS},
     helpers::add_le_bytes,
     state::{contributor::Contributor, fundraiser::Fundraiser},
 };
@@ -28,8 +28,8 @@ pub fn process_contribute_instruction(accounts: &[AccountView], data: &[u8]) -> 
         contributor,
         contributor_ata,
         vault,
-        system_program,
-        token_program,
+        _system_program,
+        _token_program,
         _extra_accounts @ ..,
     ] = accounts
     else {
@@ -38,10 +38,13 @@ pub fn process_contribute_instruction(accounts: &[AccountView], data: &[u8]) -> 
 
     let ix_data = wincode::deserialize::<ContributeData>(data)
         .map_err(|_| ProgramError::InvalidInstructionData)?;
+    let amount = u64::from_le_bytes(ix_data.amount);
+    let mint_state = pinocchio_token::state::Mint::from_account_view(mint)?;
 
-    log!("{}", ix_data.bump);
-    // log!("{}", ix_data.amount_to_raise);
-    log!("{}", u64::from_le_bytes(ix_data.amount));
+    assert!(
+        amount > 1_u8.pow(mint_state.decimals() as u32) as u64,
+        "contribution too small"
+    );
 
     // check ata owner and mint
     {
@@ -54,7 +57,6 @@ pub fn process_contribute_instruction(accounts: &[AccountView], data: &[u8]) -> 
         }
     }
 
-    log!("here 1");
     // TODO: add other time and contribution checks
 
     let bump = [ix_data.bump];
@@ -65,9 +67,7 @@ pub fn process_contribute_instruction(accounts: &[AccountView], data: &[u8]) -> 
         Seed::from(&bump),
     ];
 
-    log!("here 2");
     unsafe {
-        log!("here 2.1");
         if contributor.owner() != &crate::ID {
             CreateAccount {
                 from: user,
@@ -79,18 +79,44 @@ pub fn process_contribute_instruction(accounts: &[AccountView], data: &[u8]) -> 
             .invoke_signed(&[Signer::from(&seeds)])?;
         }
 
-        log!("here 2.0");
         let fundraiser_state = Fundraiser::from_account_info(fundraiser)?;
-        log!("here 2.0.1");
+
         let contributor_state = Contributor::from_account_info(contributor)?;
 
-        log!("here 2.2");
+        assert!(
+            amount
+                <= (u64::from_le_bytes(fundraiser_state.amount_to_raise)
+                    * MAX_CONTRIBUTION_PERCENTAGE)
+                    / PERCENTAGE_SCALER,
+            "contribution too big"
+        );
+
+        assert!(
+            (u64::from_le_bytes(contributor_state.amount)
+                <= (u64::from_le_bytes(fundraiser_state.amount_to_raise)
+                    * MAX_CONTRIBUTION_PERCENTAGE)
+                    / PERCENTAGE_SCALER)
+                && (u64::from_le_bytes(contributor_state.amount) + amount
+                    <= (u64::from_le_bytes(fundraiser_state.amount_to_raise)
+                        * MAX_CONTRIBUTION_PERCENTAGE)
+                        / PERCENTAGE_SCALER),
+            "maximum contribution reached"
+        );
+
+        let current_time = Clock::get()?.unix_timestamp;
+
+        assert!(
+            fundraiser_state.duration
+                > ((current_time - i64::from_le_bytes(fundraiser_state.time_started))
+                    / SECONDS_TO_DAYS) as u8,
+            "fundraising ended"
+        );
+
         fundraiser_state.current_amount =
             add_le_bytes(fundraiser_state.current_amount, ix_data.amount);
         contributor_state.amount = add_le_bytes(contributor_state.amount, ix_data.amount);
     }
 
-    log!("here 3");
     pinocchio_token::instructions::Transfer {
         from: contributor_ata,
         to: vault,

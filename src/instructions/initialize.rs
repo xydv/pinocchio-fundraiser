@@ -4,7 +4,6 @@ use pinocchio::{
     error::ProgramError,
     sysvars::{Sysvar, clock::Clock, rent::Rent},
 };
-use pinocchio_log::log;
 use pinocchio_pubkey::derive_address;
 use pinocchio_system::instructions::CreateAccount;
 use wincode::SchemaRead;
@@ -32,12 +31,8 @@ pub fn process_initialize_instruction(accounts: &[AccountView], data: &[u8]) -> 
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
-    let ix_data = ::wincode::deserialize::<InitializeData>(data)
+    let ix_data = wincode::deserialize::<InitializeData>(data)
         .map_err(|_| ProgramError::InvalidInstructionData)?;
-
-    log!("{}", ix_data.bump);
-    // log!("{}", ix_data.amount_to_raise);
-    log!("{}", ix_data.duration);
 
     let mint_state = pinocchio_token::state::Mint::from_account_view(mint)?;
 
@@ -63,8 +58,6 @@ pub fn process_initialize_instruction(accounts: &[AccountView], data: &[u8]) -> 
         Seed::from(&bump),
     ];
     let seeds = Signer::from(&seed);
-
-    log!("here 1");
 
     unsafe {
         if fundraiser.owner() != &crate::ID {
@@ -92,8 +85,6 @@ pub fn process_initialize_instruction(accounts: &[AccountView], data: &[u8]) -> 
             return Err(ProgramError::IllegalOwner);
         }
     }
-
-    log!("here 2");
 
     // we can do this client side to reduce CU
     pinocchio_associated_token_account::instructions::Create {
