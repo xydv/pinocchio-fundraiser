@@ -4,13 +4,14 @@ use pinocchio::{
     error::ProgramError,
     sysvars::{Sysvar, clock::Clock, rent::Rent},
 };
+use pinocchio_log::log;
 use pinocchio_pubkey::derive_address;
 use pinocchio_system::instructions::CreateAccount;
 use wincode::SchemaRead;
 
 use crate::{constants::MIN_AMOUNT_TO_RAISE, state::fundraiser::Fundraiser};
 
-#[derive(SchemaRead)]
+#[derive(SchemaRead, Debug)]
 struct InitializeData {
     pub bump: u8,
     pub amount_to_raise: [u8; 8],
@@ -34,6 +35,10 @@ pub fn process_initialize_instruction(accounts: &[AccountView], data: &[u8]) -> 
     let ix_data = ::wincode::deserialize::<InitializeData>(data)
         .map_err(|_| ProgramError::InvalidInstructionData)?;
 
+    log!("{}", ix_data.bump);
+    // log!("{}", ix_data.amount_to_raise);
+    log!("{}", ix_data.duration);
+
     let mint_state = pinocchio_token::state::Mint::from_account_view(mint)?;
 
     // checks
@@ -53,11 +58,13 @@ pub fn process_initialize_instruction(accounts: &[AccountView], data: &[u8]) -> 
 
     let bump = [bump];
     let seed = [
-        Seed::from(b"escrow"),
+        Seed::from(b"fundraiser"),
         Seed::from(maker.address().as_array()),
         Seed::from(&bump),
     ];
     let seeds = Signer::from(&seed);
+
+    log!("here 1");
 
     unsafe {
         if fundraiser.owner() != &crate::ID {
@@ -85,6 +92,8 @@ pub fn process_initialize_instruction(accounts: &[AccountView], data: &[u8]) -> 
             return Err(ProgramError::IllegalOwner);
         }
     }
+
+    log!("here 2");
 
     // we can do this client side to reduce CU
     pinocchio_associated_token_account::instructions::Create {

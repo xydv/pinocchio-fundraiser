@@ -8,10 +8,11 @@ use crate::instructions::FundraiserInstructions;
 mod constants;
 mod instructions;
 mod state;
+mod tests;
 
 entrypoint!(process_instruction);
 
-declare_id!("4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT");
+declare_id!("7dTBf2CHGabKL715FsRHyJqjQxVsMWVLYL51FknB1FKf");
 
 pub fn process_instruction(
     program_id: &Address,
