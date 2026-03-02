@@ -9,7 +9,7 @@ pub struct Contributor {
 }
 
 impl Contributor {
-    const LEN: usize = std::mem::size_of::<Contributor>();
+    pub const LEN: usize = std::mem::size_of::<Contributor>();
 
     pub fn from_account_info(account_info: &AccountView) -> Result<&mut Self, ProgramError> {
         let mut data = account_info.try_borrow_mut()?;

@@ -6,6 +6,7 @@ use pinocchio::{
 use crate::instructions::FundraiserInstructions;
 
 mod constants;
+mod helpers;
 mod instructions;
 mod state;
 mod tests;
@@ -30,7 +31,7 @@ pub fn process_instruction(
             instructions::process_initialize_instruction(accounts, data)?
         }
         FundraiserInstructions::Contribute => {
-            instructions::process_initialize_instruction(accounts, data)?
+            instructions::process_contribute_instruction(accounts, data)?
         }
         FundraiserInstructions::Checker => {
             instructions::process_checker_instruction(accounts, data)?
